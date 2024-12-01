@@ -1,0 +1,16 @@
+/* Basic styling for the quiz elements */
+body {
+    font-family: sans-serif;
+}
+
+#quiz-container {
+    /* Add some layout styles */
+}
+
+.question {
+    /* Style each question */
+}
+
+.option {
+    /* Style the answer buttons */
+}
