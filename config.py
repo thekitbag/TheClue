@@ -1,15 +1,15 @@
 import os
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-
 class Config(object):
-	SECRET_KEY= os.environ.get('APP_SECRET_KEY')
+	SQLALCHEMY_DATABASE_URI = 'sqlite:///app.db'
+	SQLALCHEMY_TRACK_MODIFICATIONS = False
+	GPT_API_KEY= os.environ.get('GPT_API_KEY')
+
 
 class DevelopmentConfig(Config):
 	SECRET_KEY = 'supersecurepw'
 
 class ProductionConfig(Config):
-	CORS_ORIGINS = 'https://www.hedgehog.fyi'
-
+	SECRET_KEY= os.environ.get('APP_SECRET_KEY')
 
 

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Play Quiz</title>
+</head>
+<body>
+    <h1>{{ quiz_name }}</h1> 
+
+    <div id="question-container">
+        {% if current_question %}
+            <p>{{ current_question }}</p> 
+            <ul id="answer-list"></ul> 
+        {% else %}
+            <p>No questions available.</p>
+        {% endif %}
+    </div>
+
+    <div id="feedback"></div>
+
+    <script>
+        const questions = {{ questions | tojson }};  // Pass questions from Flask
+        let currentQuestionIndex = 0;
+
+        function displayQuestion() {
+            const questionContainer = document.getElementById('question-container');
+            const answerList = document.getElementById('answer-list');
+            answerList.innerHTML = ''; // Clear previous answers
+
+            if (currentQuestionIndex < questions.length) {
+                const questionText = questions[currentQuestionIndex];
+                questionContainer.querySelector('p').textContent = questionText;
+
+                // TODO: Generate answer options dynamically (using ChatGPT or predefined)
+                // Example (replace with actual answer generation):
+                const answerOptions = generateAnswerOptions(questionText); 
+
+                answerOptions.forEach(answer => {
+                    const li = document.createElement('li');
+                    const button = document.createElement('button');
+                    button.textContent = answer;
+                    button.classList.add('answer-button');
+                    // Add event listener to button for answer checking (we'll add this later)
+                    li.appendChild(button);
+                    answerList.appendChild(li);
+                });
+            } else {
+                questionContainer.innerHTML = '<p>Quiz finished!</p>'; 
+            }
+        }
+
+        // Placeholder function for answer option generation (replace with your logic)
+        function generateAnswerOptions(question) {
+            // TODO: Use ChatGPT API or predefined logic to generate answer options
+            return ["Option 1", "Option 2", "Option 3"]; 
+        }
+
+        displayQuestion(); // Display the first question initially
+    </script>
+</body>
+</html>
