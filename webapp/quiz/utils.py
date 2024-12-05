@@ -1,8 +1,9 @@
 import uuid
 from webapp import db  
 from webapp.models import Quiz
-import openai
+from openai import OpenAI
 import os
+import json
 from flask import current_app
 
 def store_quiz_configuration(quiz_id, quiz_name, num_questions):
@@ -14,26 +15,49 @@ def generate_quiz_id():
     return str(uuid.uuid4())
 
 def generate_questions(topic, num_questions):
-    openai.api_key = current_app.config['GPT_API_KEY']
+    client = OpenAI(api_key=current_app.config['GPT_API_KEY'])
+
 
 
     system_message = "You are quizGPT, you will receive a topic and a number of questions. \
     Provide the questions and answers in json format. The players will be british and of slightly \
     above average intelligence"
 
-    user_message = f"{num_questions} about {topic}"
+    user_message = f"{num_questions} questions about {topic}"
                 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
-                            {"role": "system", "content": system_message},
-                            {"role": "user", "content": user_message}
+                        {
+                        "role": "system",
+                        "content": [
+                            {
+                            "type": "text",
+                            "text": system_message
+                            }
                         ]
+                        },
+                        {
+                        "role": "user",
+                        "content": [
+                            {
+                            "type": "text",
+                            "text": user_message
+                            }
+                        ]
+                        }
+                    ],
+                    response_format={
+                        "type": "json_object"
+                    },
+                    temperature=1,
+                    max_tokens=2048,
+                    top_p=1,
+                    frequency_penalty=0,
+                    presence_penalty=0
                     )
+    content = response.choices[0].message.content
+    content_dict = json.loads(content)  
+    questions = content_dict['questions']
     
-    print(response)
-
-    questions = response.choices[0].text.strip().split("\n")
-
-    print(questions)
     return questions

@@ -19,21 +19,24 @@
 
     <script>
         const questions = {{ questions | tojson }};  // Pass questions from Flask
+        console.log(questions)
         let currentQuestionIndex = 0;
-
+    
         function displayQuestion() {
             const questionContainer = document.getElementById('question-container');
+            //console.log(questionContainer)
             const answerList = document.getElementById('answer-list');
+            console.log(answerList)
             answerList.innerHTML = ''; // Clear previous answers
-
+    
             if (currentQuestionIndex < questions.length) {
-                const questionText = questions[currentQuestionIndex];
+                const currentQuestion = questions[currentQuestionIndex]; // Get the current question object
+                const questionText = currentQuestion.question; // Access the question text
                 questionContainer.querySelector('p').textContent = questionText;
-
-                // TODO: Generate answer options dynamically (using ChatGPT or predefined)
-                // Example (replace with actual answer generation):
-                const answerOptions = generateAnswerOptions(questionText); 
-
+    
+                // Assuming 'options' is an array of answer options in your question object
+                const answerOptions = currentQuestion.options;
+    
                 answerOptions.forEach(answer => {
                     const li = document.createElement('li');
                     const button = document.createElement('button');
@@ -48,13 +51,10 @@
             }
         }
 
-        // Placeholder function for answer option generation (replace with your logic)
-        function generateAnswerOptions(question) {
-            // TODO: Use ChatGPT API or predefined logic to generate answer options
-            return ["Option 1", "Option 2", "Option 3"]; 
-        }
-
-        displayQuestion(); // Display the first question initially
+        document.addEventListener('DOMContentLoaded', () => {
+            displayQuestion(); // Display the first question initially
+        });
+    
     </script>
 </body>
 </html>
