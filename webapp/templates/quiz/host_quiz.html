@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Host Quiz - {{ quiz_data.quiz_name }}</title>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Hosting: {{ quiz_data.quiz_name }}</h1>
+
+    <h2>Players</h2>
+    <ul id="player-list"></ul>
+
+    <script>
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const quizId = "{{ quiz_data.quiz_id }}";
+        const socket = io('/quiz');
+
+        socket.on('player_joined', (data) => {
+            console.log('server player joined event received')
+            if (data.quiz_id === quizId) {
+                fetchAndDisplayPlayers();
+            }
+        });
+
+        function fetchAndDisplayPlayers() {
+            fetch(`/players/${quizId}`)
+                .then(response => response.json())
+                .then(players => {
+                    const playerList = document.getElementById('player-list');
+                    playerList.innerHTML = ''; 
+
+                    players.forEach(player => {
+                        const li = document.createElement('li');
+                        li.textContent  = player; 
+                        playerList.appendChild(li);
+                    });
+                });
+        }
+
+        // Call fetchAndDisplayPlayers initially to populate the list when the page loads
+        fetchAndDisplayPlayers(); 
+    });
+
+    </script>
+</body>
+</html>

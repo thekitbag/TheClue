@@ -1,60 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Play Quiz</title>
+  <title>Play Quiz</title>
+  <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 </head>
 <body>
-    <h1>{{ quiz_name }}</h1> 
+  <h1>{{ quiz_data.quiz_name }}</h1>
 
-    <div id="question-container">
-        {% if current_question %}
-            <p>{{ current_question }}</p> 
-            <ul id="answer-list"></ul> 
-        {% else %}
-            <p>No questions available.</p>
-        {% endif %}
-    </div>
+  <div id="player-name-form">
+    <label for="player_name">Enter your name:</label>
+    <input type="text" id="player_name" name="player_name" required>
+    <button type="button" onclick="joinQuiz()">Join Quiz</button>
+  </div>
 
-    <div id="feedback"></div>
+  <div id="question-container" style="display: none;"> </div>
 
-    <script>
-        const questions = {{ questions | tojson }};  // Pass questions from Flask
-        console.log(questions)
-        let currentQuestionIndex = 0;
-    
-        function displayQuestion() {
-            const questionContainer = document.getElementById('question-container');
-            //console.log(questionContainer)
-            const answerList = document.getElementById('answer-list');
-            console.log(answerList)
-            answerList.innerHTML = ''; // Clear previous answers
-    
-            if (currentQuestionIndex < questions.length) {
-                const currentQuestion = questions[currentQuestionIndex]; // Get the current question object
-                const questionText = currentQuestion.question; // Access the question text
-                questionContainer.querySelector('p').textContent = questionText;
-    
-                // Assuming 'options' is an array of answer options in your question object
-                const answerOptions = currentQuestion.options;
-    
-                answerOptions.forEach(answer => {
-                    const li = document.createElement('li');
-                    const button = document.createElement('button');
-                    button.textContent = answer;
-                    button.classList.add('answer-button');
-                    // Add event listener to button for answer checking (we'll add this later)
-                    li.appendChild(button);
-                    answerList.appendChild(li);
-                });
-            } else {
-                questionContainer.innerHTML = '<p>Quiz finished!</p>'; 
-            }
-        }
+  <div id="feedback"></div>
 
-        document.addEventListener('DOMContentLoaded', () => {
-            displayQuestion(); // Display the first question initially
+  <script>
+    const quizId = "{{ quiz_data.quiz_id }}";
+    const socket = io('/quiz');
+
+    function joinQuiz() {
+      const playerName = document.getElementById('player_name').value;
+
+      // Send player name to the server
+      fetch(`/join/${quizId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: `player_name=${playerName}`
+        })
+        .then(response => {
+          if (response.ok) {
+            // Hide the form and show the question container
+            document.getElementById('player-name-form').style.display = 'none';
+            document.getElementById('question-container').style.display = 'block';
+
+            // Now you can proceed with the quiz logic
+            // ... (your existing quiz logic) ...
+          } else {
+            // Handle errors, e.g., display an error message
+            console.error('Failed to join the quiz');
+          }
         });
-    
-    </script>
+    }
+  </script>
 </body>
 </html>

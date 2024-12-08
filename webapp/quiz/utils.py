@@ -1,14 +1,22 @@
 import uuid
 from webapp import db  
-from webapp.models import Quiz
+from webapp.models import Quiz, Question
 from openai import OpenAI
 import os
 import json
 from flask import current_app
 
-def store_quiz_configuration(quiz_id, quiz_name, num_questions):
+def store_quiz_configuration(quiz_id, quiz_name, num_questions, questions):
     quiz = Quiz(quiz_id=quiz_id, quiz_name=quiz_name, num_questions=num_questions)
     db.session.add(quiz)
+
+    for question_data in questions:
+        question = Question(quiz_id=quiz_id, 
+                            question_text=question_data['question'], 
+                            answer=question_data['answer'],
+                            options=", ".join(question_data['options']))  # Assuming options is a list
+        db.session.add(question)
+
     db.session.commit()
 
 def generate_quiz_id():

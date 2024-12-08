@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Join Quiz</title>
+</head>
+<body>
+    <h1>Join a Quiz</h1>
+
+    <ul>
+        {% for quiz in quizzes %}
+            <li>
+                <a href="{{ url_for('quiz.play_quiz', quiz_id=quiz.quiz_id) }}">{{ quiz.quiz_name }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
