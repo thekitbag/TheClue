@@ -1,14 +1,25 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Host Quiz - {{ quiz_data.quiz_name }}</title>
-    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
-</head>
-<body>
-    <h1>Hosting: {{ quiz_data.quiz_name }}</h1>
+{% extends 'base.html' %}
 
-    <h2>Players</h2>
-    <ul id="player-list"></ul>
+{% block title %}Host Quiz - {{ quiz_data.quiz_name }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+    <h1 class="text-4xl font-bold mb-8 text-gray-800">Hosting: {{ quiz_data.quiz_name }}</h1>
+  
+    <h2 class="text-2xl font-semibold mb-4 text-gray-800">Players</h2>
+    <table id="player-list" class="table-auto border-collapse border border-gray-400 mb-8"> 
+        <thead>
+            <tr class="bg-blue-500 text-white"> 
+                <th class="px-4 py-2 text-center font-bold">Player Name</th>
+                <th class="px-4 py-2 text-center font-bold">Points</th> 
+            </tr>
+        </thead>
+        <tbody> </tbody> 
+    </table> 
+  
+    <div id="feedback" class="text-4xl font-bold text-center"></div> 
+    <div id="options" class="mt-8"></div> 
+</div>
 
     <script>
 
@@ -23,25 +34,64 @@
             }
         });
 
+        socket.on('quiz_start', (data) => {
+            if (data.quiz_id === quizId) {
+                const feedbackDiv = document.getElementById('feedback');
+                feedbackDiv.textContent = 'Quiz started, get ready for the first question!'; 
+            }
+        });
+
+        socket.on('question', (data) => {
+            if (data.quiz_id === quizId) {
+                document.getElementById('feedback').textContent = data.question;
+
+                // Display the options
+                const optionsDiv = document.getElementById('options');
+                optionsDiv.innerHTML = ''; // Clear previous options
+
+            }
+        });
+
+        socket.on('answer_submitted', (data) => {
+            if (data.quiz_id === quizId) {
+                const playerName = data.player_name;
+
+                const playerList = document.getElementById('player-list').getElementsByTagName('tbody')[0];
+                for (let i = 0; i < playerList.rows.length; i++) {
+                    const nameCell = playerList.rows[i].cells[0];
+                    if (nameCell.textContent === playerName) {
+                        nameCell.style.backgroundColor = 'lightblue'; 
+                        break;
+                    }
+                }
+            }
+        });
+
         function fetchAndDisplayPlayers() {
-            fetch(`/players/${quizId}`)
+            fetch(`/players/${quizId}`) 
                 .then(response => response.json())
                 .then(players => {
-                    const playerList = document.getElementById('player-list');
-                    playerList.innerHTML = ''; 
+                    const playerList = document.getElementById('player-list').getElementsByTagName('tbody')[0]; 
+                    playerList.innerHTML = ''; // Clear the table body
 
+                    // Add each player to the table
                     players.forEach(player => {
-                        const li = document.createElement('li');
-                        li.textContent  = player; 
-                        playerList.appendChild(li);
+                        const row = playerList.insertRow();
+                        const nameCell = row.insertCell();
+                        nameCell.className = "text-center";
+                        nameCell.textContent = player.name; 
+                        const pointsCell = row.insertCell();
+                        pointsCell.className = "text-center";
+                        pointsCell.textContent = player.points; 
                     });
-                });
-        }
+                })
+}
 
-        // Call fetchAndDisplayPlayers initially to populate the list when the page loads
         fetchAndDisplayPlayers(); 
     });
 
     </script>
 </body>
 </html>
+
+{% endblock %}

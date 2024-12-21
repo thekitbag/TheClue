@@ -5,27 +5,40 @@ class Quiz(db.Model):
     quiz_id = db.Column(db.String(64), index=True, unique=True)
     quiz_name = db.Column(db.String(128))
     num_questions = db.Column(db.Integer)
-    # ... other quiz attributes ...
+    num_players = db.Column(db.Integer)
 
     def __repr__(self):
         return f'<Quiz {self.quiz_name}>'
 
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    quiz_id = db.Column(db.String(64), db.ForeignKey('quiz.quiz_id'), index=True)  # Foreign key to Quiz
+    quiz_id = db.Column(db.String(64), db.ForeignKey('quiz.quiz_id'), index=True)
     question_text = db.Column(db.Text)  # Store the question text
     answer = db.Column(db.String(255))  # Store the correct answer
     options = db.Column(db.String(512))  # Store the answer options (you might need to adjust the type based on how you store them)
 
-    quiz = db.relationship('Quiz', backref='questions')  # Define the relationship
+    quiz = db.relationship('Quiz', backref='questions', foreign_keys=[quiz_id])  # Specify foreign_keys
 
     def __repr__(self):
         return f'<Question {self.question_text}>'
+
+class CurrentQuestion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_id = db.Column(db.String(64), db.ForeignKey('quiz.quiz_id'), unique=True)
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
+
+    quiz = db.relationship('Quiz', backref=db.backref('current_question_relationship', uselist=False)) # Use uselist=False for one-to-one
+    question = db.relationship('Question')
+
+    def __repr__(self):
+        return f'<CurrentQuestion for Quiz {self.quiz_id}>'
     
 class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128), index=True)
     quiz_id = db.Column(db.String(64), db.ForeignKey('quiz.quiz_id'), index=True)
+    score = db.Column(db.Integer, default=0)  # Add the score attribute with a default value of 0
+
 
     quiz = db.relationship('Quiz', backref='players')
 

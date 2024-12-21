@@ -1,28 +1,94 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Play Quiz</title>
-  <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
-</head>
-<body>
-  <h1>{{ quiz_data.quiz_name }}</h1>
+{% extends 'base.html' %}
 
-  <div id="player-name-form">
-    <label for="player_name">Enter your name:</label>
-    <input type="text" id="player_name" name="player_name" required>
-    <button type="button" onclick="joinQuiz()">Join Quiz</button>
+{% block title %}Play Quiz - {{ quiz_data.quiz_name }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+  <h1 class="text-4xl font-bold mb-8 text-gray-800">{{ quiz_data.quiz_name }}</h1>
+
+  <div id="player-name-form" class="w-full max-w-sm">
+    <div class="mb-4">
+        <label for="player_name" class="block text-gray-700 font-bold mb-2">Enter your name:</label>
+        <input type="text" id="player_name" name="player_name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+    </div>
+    <div class="flex items-center justify-between">
+        <button type="button" onclick="joinQuiz()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+            Join Quiz
+        </button>
+    </div>
   </div>
 
-  <div id="question-container" style="display: none;"> </div>
+  <div id="waiting-message" class="text-xl font-semibold mt-4" style="display: none;">Waiting for other players to join...</div> 
+  <div id="feedback" class="text-5xl font-bold mt-12 text-center"></div>
+  <div id="options" class="mt-12"> </div> 
 
-  <div id="feedback"></div>
 
   <script>
     const quizId = "{{ quiz_data.quiz_id }}";
     const socket = io('/quiz');
+    let playerId;
+
+    socket.on('quiz_start', (data) => {
+      if (data.quiz_id === quizId) {
+        document.getElementById('waiting-message').style.display = 'none';; 
+
+        // Display the "Quiz started" message
+        const feedbackDiv = document.getElementById('feedback');
+        feedbackDiv.textContent = 'Quiz started, get ready for the first question!'; 
+      }
+    });
+    
+    socket.on('question', (data) => {
+        if (data.quiz_id === quizId) {
+            const feedbackDiv = document.getElementById('feedback');
+            feedbackDiv.textContent = data.question;
+            
+            const optionsDiv = document.getElementById('options');
+            optionsDiv.innerHTML = '';
+            console.log(data)
+
+            data.options.forEach(option => {
+              const button = document.createElement('button');
+              button.textContent = option;
+              button.classList.add(
+                  'bg-blue-500', 
+                  'hover:bg-blue-700', 
+                  'text-white', 
+                  'font-bold', 
+                  'py-4',  
+                  'px-6',  
+                  'rounded', 
+                  'w-full', 
+                  'mb-6',   
+                  'text-2xl'
+              );
+                button.addEventListener('click', () => {
+                  document.getElementById('options').style.display = 'none';
+                  document.getElementById('feedback').style.display = 'none';
+                  document.getElementById('waiting-message').style.display = 'block'; 
+                  document.getElementById('waiting-message').textContent = 'Waiting for other players to answer...'; 
+                  fetch('/answer', { 
+                      method: 'POST',
+                      headers: {
+                          'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({ quiz_id: quizId, answer: option, player_id: playerId }) 
+                  })
+                  .then(response => {
+                      // Handle the response from the server (e.g., show feedback)
+                  });
+                });
+                optionsDiv.appendChild(button);
+            });
+        }
+    })
 
     function joinQuiz() {
-      const playerName = document.getElementById('player_name').value;
+      let playerName = document.getElementById('player_name').value;
+      document.getElementById('player-name-form').remove();
+      document.getElementById('waiting-message').style.display = 'block'; 
+
+
 
       // Send player name to the server
       fetch(`/join/${quizId}`, {
@@ -32,14 +98,13 @@
           },
           body: `player_name=${playerName}`
         })
-        .then(response => {
-          if (response.ok) {
-            // Hide the form and show the question container
-            document.getElementById('player-name-form').style.display = 'none';
+        .then(response => response.json())
+        .then(data => {
+          if (data.player_id) {
+            playerId = data.player_id; 
             document.getElementById('question-container').style.display = 'block';
+            document.getElementById('waiting-message').innerHTML = 'Waiting for other players to join...';
 
-            // Now you can proceed with the quiz logic
-            // ... (your existing quiz logic) ...
           } else {
             // Handle errors, e.g., display an error message
             console.error('Failed to join the quiz');
@@ -47,5 +112,6 @@
         });
     }
   </script>
-</body>
-</html>
+</div>
+{% endblock %}
+

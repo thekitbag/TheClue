@@ -1,17 +1,19 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Super Hans' Christmas Cracker</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"> 
-</head>
-<body>
-    <h1>Welcome to The Sign</h1>
+{% extends './base.html' %}
 
-    <p>The Crane, Crocker, Gray family entertainment centre, designed to make all of our holidays mildly more bearable</p>
+{% block title %}The Clue - Home{% endblock %}
 
-    <p>Choose some entertainment from the list below:</p>
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-screen bg-gray-100"> 
+    <img src="{{ url_for('static', filename='theclue.jpeg') }}" alt="The Sign" class="w-64 h-64 rounded-full mb-8"> 
 
-    <a href="{{ url_for('quiz.home') }}">AI Quiz</a> 
+    <h1 class="text-4xl font-bold mb-4 text-gray-800">Welcome to The Sign</h1>
 
-</body>
-</html>
+    <p class="text-lg text-gray-700 mb-6">The Crane, Crocker, Gray family entertainment centre, designed to make all of our holidays mildly more bearable</p>
+
+    <p class="text-xl text-gray-800 mb-8">Choose some entertainment from the list below:</p>
+
+    <a href="{{ url_for('quiz.home') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+        AI Quiz
+    </a>
+</div>
+{% endblock %}

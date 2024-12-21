@@ -1,6 +1,7 @@
+import time
 from flask import render_template, request, redirect, url_for, session, jsonify
 from .utils import generate_quiz_id, store_quiz_configuration, generate_questions 
-from webapp.models import Quiz, Player
+from webapp.models import Quiz, Player, CurrentQuestion
 from webapp.quiz import bp  
 from webapp import socketio
 from webapp import db
@@ -22,6 +23,8 @@ def start_quiz():
     if request.method == 'POST':
         quiz_name = request.form['quiz_name']
         num_questions = int(request.form['num_questions'])
+        num_players = int(request.form['num_players'])  
+
         
 
 
@@ -40,10 +43,8 @@ def start_quiz():
                             }]
 
         #questions = generate_questions(quiz_name, num_questions)
-        session['questions'] = example_questions 
-
-        store_quiz_configuration(quiz_id, quiz_name, num_questions, example_questions)
-
+        
+        store_quiz_configuration(quiz_id, quiz_name, num_questions, num_players, example_questions)  
 
         return redirect(url_for('quiz.host_quiz', quiz_id=quiz_id))
 
@@ -63,16 +64,27 @@ def join_quiz(quiz_id):
     if not player_name:
         return jsonify({'error': 'Player name is required'}), 400
 
-    # Create a new player and add them to the database
+    quiz = Quiz.query.filter_by(quiz_id=quiz_id).first()
+    if len(quiz.players) >= quiz.num_players:
+        return jsonify({'error': 'Quiz is full'}), 
+
     player = Player(name=player_name, quiz_id=quiz_id)
+
     db.session.add(player)
     db.session.commit()
 
-    # Emit the 'player_joined' event
     socketio.emit('player_joined', {'quiz_id': quiz_id, 'player_name': player_name}, namespace='/quiz')
-    print('join event emitted', quiz_id)
 
-    return jsonify({'message': 'Joined quiz successfully'}), 200
+    if len(quiz.players) == quiz.num_players:
+        socketio.emit('quiz_start', {'quiz_id': quiz_id}, namespace='/quiz')
+        time.sleep(3)
+        question = quiz.questions[0].question_text
+        options = quiz.questions[0].options.split(', ')
+        print(options)
+        socketio.emit('question', {'quiz_id': quiz_id, 'question': question, 'options': options}, namespace='/quiz')
+
+
+    return jsonify({'message': 'Joined quiz successfully', 'player_id': player.id}), 200
 
 @bp.route('/host/<quiz_id>')
 def host_quiz(quiz_id):
@@ -85,10 +97,8 @@ def host_quiz(quiz_id):
 @bp.route('/players/<quiz_id>')
 def get_players(quiz_id):
     players = Player.query.filter_by(quiz_id=quiz_id).all()
-    player_names = [player.name for player in players]
-    return jsonify(player_names)
-
-
+    players_and_points = [{'name':player.name, 'points':player.score} for player in players]
+    return jsonify(players_and_points)
 
 @socketio.on('player_joined', namespace='/quiz')
 def handle_player_joined(data):
@@ -100,6 +110,39 @@ def handle_player_joined(data):
 
     # Emit a 'player_list_updated' event to update the leaderboard on the host's page
     socketio.emit('player_list_updated', {'quiz_id': quiz_id}, namespace='/quiz')
+
+@bp.route('/answer', methods=['POST'])
+def handle_answer():
+    data = request.get_json()
+    quiz_id = data.get('quiz_id')
+    player_id = data.get('player_id')
+    answer = data.get('answer')
+
+
+    player = Player.query.filter_by(id=player_id, quiz_id=quiz_id).first()
+    current_question_relationship = CurrentQuestion.query.filter_by(quiz_id=quiz_id).first()
+    question = current_question_relationship.question 
+
+    if player is None or question is None:
+        return jsonify({'error': 'Player or question not found'}), 400
+
+    is_correct = answer == question.answer
+
+    # 3. Update the player's score (you might need to add a score attribute to the Player model)
+    if is_correct:
+        player.score = (player.score or 0) + 1  # Increment score if correct (handle initial score if needed)
+        db.session.commit()
+
+    # 4. Emit an event to update the host's view
+    socketio.emit('answer_submitted', {
+        'quiz_id': quiz_id,
+        'player_name': player.name,
+        'is_correct': is_correct
+    }, namespace='/quiz')
+
+    # 5. (Optional) Check if all players have answered and emit a 'quiz_finished' event if so
+
+    return jsonify({'message': 'Answer received'}), 200
     
 
 
