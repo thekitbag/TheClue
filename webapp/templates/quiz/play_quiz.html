@@ -40,6 +40,10 @@
     
     socket.on('question', (data) => {
         if (data.quiz_id === quizId) {
+            document.getElementById('options').style.display = 'block';
+            document.getElementById('feedback').style.display = 'block';
+            document.getElementById('waiting-message').style.display = 'none'; 
+
             const feedbackDiv = document.getElementById('feedback');
             feedbackDiv.textContent = data.question;
             

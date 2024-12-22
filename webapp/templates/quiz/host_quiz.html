@@ -67,6 +67,23 @@
             }
         });
 
+        socket.on('all_players_answered', (data) => {
+            if (data.quiz_id === quizId) {
+                const playerList = document.getElementById('player-list').getElementsByTagName('tbody')[0];
+                for (let i = 0; i < playerList.rows.length; i++) {
+                    const nameCell = playerList.rows[i].cells[0];
+                    nameCell.style.backgroundColor = 'initial'; 
+                }
+                const feedbackDiv = document.getElementById('feedback');
+                feedbackDiv.textContent = 'Well done winners! on to the next question!'; 
+
+                // 2. Update the leaderboard
+                fetchAndDisplayPlayers(); 
+
+                // 3. (We'll handle proceeding to the next question later)
+            }
+        });
+
         function fetchAndDisplayPlayers() {
             fetch(`/players/${quizId}`) 
                 .then(response => response.json())

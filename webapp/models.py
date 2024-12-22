@@ -44,3 +44,16 @@ class Player(db.Model):
 
     def __repr__(self):
         return f'<Player {self.name}>'
+
+
+class Answer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), index=True)
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'), index=True)
+    answer_text = db.Column(db.String(255))  # Store the player's answer
+
+    player = db.relationship('Player', backref='answers')
+    question = db.relationship('Question', backref='answers')
+
+    def __repr__(self):
+        return f'<Answer by {self.player.name} to {self.question.question_text}>'

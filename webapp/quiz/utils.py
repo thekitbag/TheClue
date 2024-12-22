@@ -1,5 +1,6 @@
 import uuid
-from webapp import db  
+from webapp import db
+from webapp import socketio
 from webapp.models import Quiz, Question, CurrentQuestion
 from openai import OpenAI
 import os
@@ -34,7 +35,11 @@ def generate_questions(topic, num_questions):
 
     system_message = "You are quizGPT, you will receive a topic and a number of questions. \
     Provide the questions and answers in json format. The players will be british and of slightly \
-    above average intelligence"
+    above average intelligence. You should always provide four options and indicate which one is correct.\
+    The response should be JSON which consists of a list of dictionaries. Each list has 3 keys: 'question', \
+    'options' and 'answer'. 'question' should have a value thas is a string containing a question. 'options' \
+    should be a list of strings containing the possible answers', 'answer' should contain a string matching one of \
+    the options and be the one that is the correct answer to the question."
 
     user_message = f"{num_questions} questions about {topic}"
                 
@@ -72,5 +77,18 @@ def generate_questions(topic, num_questions):
     content = response.choices[0].message.content
     content_dict = json.loads(content)  
     questions = content_dict['questions']
+    print(questions)
     
     return questions
+
+
+def emit_next_question(quiz_id):
+    quiz = Quiz.query.filter_by(quiz_id=quiz_id).first()
+    if quiz:
+        current_question_index = quiz.questions.index(quiz.current_question_relationship.question)
+        if current_question_index <= len(quiz.questions) - 1:
+            next_question = quiz.questions[current_question_index]
+            options = next_question.options.split(', ')
+            socketio.emit('question', {'quiz_id': quiz_id, 'question': next_question.question_text, 'options': options}, namespace='/quiz')
+        else:
+            socketio.emit('quiz_ended', {'quiz_id': quiz_id}, namespace='/quiz')

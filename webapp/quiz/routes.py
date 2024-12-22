@@ -1,7 +1,7 @@
 import time
 from flask import render_template, request, redirect, url_for, session, jsonify
-from .utils import generate_quiz_id, store_quiz_configuration, generate_questions 
-from webapp.models import Quiz, Player, CurrentQuestion
+from .utils import generate_quiz_id, store_quiz_configuration, generate_questions, emit_next_question
+from webapp.models import Quiz, Player, CurrentQuestion, Answer
 from webapp.quiz import bp  
 from webapp import socketio
 from webapp import db
@@ -25,9 +25,6 @@ def start_quiz():
         num_questions = int(request.form['num_questions'])
         num_players = int(request.form['num_players'])  
 
-        
-
-
         quiz_id = generate_quiz_id()
         example_questions = [{'answer': 'O', 
                             'question': 'What is the chemical symbol for oxygen on the periodic table?',
@@ -42,7 +39,7 @@ def start_quiz():
                             'options': ['The River Thames', 'The Severn', 'The Seine']
                             }]
 
-        #questions = generate_questions(quiz_name, num_questions)
+        #questions = generate_questions('General Knowledge', num_questions)
         
         store_quiz_configuration(quiz_id, quiz_name, num_questions, num_players, example_questions)  
 
@@ -100,17 +97,6 @@ def get_players(quiz_id):
     players_and_points = [{'name':player.name, 'points':player.score} for player in players]
     return jsonify(players_and_points)
 
-@socketio.on('player_joined', namespace='/quiz')
-def handle_player_joined(data):
-    quiz_id = data['quiz_id']
-    player_name = data['player_name']
-    print(f"Received player_joined event for quiz ID: {quiz_id}, Player: {player_name}")
-
-    # ... (Optional: any additional logic you want to perform on the server) ...
-
-    # Emit a 'player_list_updated' event to update the leaderboard on the host's page
-    socketio.emit('player_list_updated', {'quiz_id': quiz_id}, namespace='/quiz')
-
 @bp.route('/answer', methods=['POST'])
 def handle_answer():
     data = request.get_json()
@@ -118,31 +104,45 @@ def handle_answer():
     player_id = data.get('player_id')
     answer = data.get('answer')
 
-
     player = Player.query.filter_by(id=player_id, quiz_id=quiz_id).first()
     current_question_relationship = CurrentQuestion.query.filter_by(quiz_id=quiz_id).first()
-    question = current_question_relationship.question 
+    question = current_question_relationship.question
+
+    answer_record = Answer(player_id=player.id, question_id=question.id, answer_text=answer)
+    db.session.add(answer_record)
+    db.session.commit()
 
     if player is None or question is None:
         return jsonify({'error': 'Player or question not found'}), 400
 
     is_correct = answer == question.answer
 
-    # 3. Update the player's score (you might need to add a score attribute to the Player model)
     if is_correct:
-        player.score = (player.score or 0) + 1  # Increment score if correct (handle initial score if needed)
+        player.score = (player.score or 0) + 1 
         db.session.commit()
 
-    # 4. Emit an event to update the host's view
     socketio.emit('answer_submitted', {
         'quiz_id': quiz_id,
         'player_name': player.name,
         'is_correct': is_correct
     }, namespace='/quiz')
 
-    # 5. (Optional) Check if all players have answered and emit a 'quiz_finished' event if so
+    quiz_players = Player.query.filter_by(quiz_id=quiz_id).all()
+    current_question_id = CurrentQuestion.query.filter_by(quiz_id=quiz_id).first().question_id
+
+    if all(any(answer.question_id == current_question_id for answer in player.answers) for player in quiz_players):
+        socketio.emit('all_players_answered', {'quiz_id': quiz_id}, namespace='/quiz')
+        quiz = Quiz.query.filter_by(quiz_id=quiz_id).first()
+        current_question_index = quiz.questions.index(quiz.current_question_relationship.question)
+        if current_question_index < len(quiz.questions):
+            quiz.current_question_relationship.question = quiz.questions[current_question_index + 1]
+        db.session.commit()
+        time.sleep(5)
+        emit_next_question(quiz_id)
 
     return jsonify({'message': 'Answer received'}), 200
+
+ 
     
 
 
