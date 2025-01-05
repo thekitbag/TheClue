@@ -1,8 +1,8 @@
 import time
 from flask import render_template, request, redirect, url_for, session, jsonify
-from flask_login import login_required
+from flask_login import login_required, current_user
 from .utils import generate_quiz_id, store_quiz_configuration, generate_questions, emit_next_question
-from webapp.models import Quiz, Player, CurrentQuestion, Answer, Question
+from webapp.models import Quiz, CurrentQuestion, Answer, Question, UserQuizzes, User
 from webapp.quiz import bp  
 from webapp import socketio
 from webapp import db
@@ -63,40 +63,31 @@ def play_quiz(quiz_id):
 @bp.route('/join/<quiz_id>', methods=['POST'])
 @login_required 
 def join_quiz(quiz_id):
-    player_id = request.get_json().get('player_id')
-    if not player_id:
-        return jsonify({'error': 'Player ID is required'}), 400
-    
-    if int(player_id) != current_user.id:  
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    player = Player.query.get(player_id) 
-    if player is None:
-        return jsonify({'error': 'Player not found'}), 404
-
     quiz = Quiz.query.filter_by(quiz_id=quiz_id).first()
-    if len(quiz.players) >= quiz.num_players:
-        return jsonify({'error': 'Quiz is full'}), 
 
-    player = Player(name=player_name, quiz_id=quiz_id)
+    if len(quiz.user_quizzes_rel.all()) >= quiz.num_players:  
+        return jsonify({'error': 'Quiz is full'}), 401
 
-    db.session.add(player)
+    current_user.quizzes.append(quiz)
     db.session.commit()
 
-    socketio.emit('player_joined', {'quiz_id': quiz_id, 'player_name': player_name}, namespace='/quiz')
+    socketio.emit('player_joined', {'quiz_id': quiz_id, 'username': current_user.username}, namespace='/quiz')
 
-    if len(quiz.players) == quiz.num_players:
+    if len(quiz.user_quizzes_rel.all()) == quiz.num_players:
         quiz.state = 'started'
         db.session.commit()
         socketio.emit('quiz_start', {'quiz_id': quiz_id}, namespace='/quiz')
         time.sleep(3)
-        question = quiz.questions[0].question_text
-        options = quiz.questions[0].options.split(', ')
-        print(options)
+
+        # Get the first question using current_question_relationship
+        first_question = quiz.current_question_relationship.question  
+        question = first_question.question_text
+        options = first_question.options.split(', ')
+
         socketio.emit('question', {'quiz_id': quiz_id, 'question': question, 'options': options}, namespace='/quiz')
 
 
-    return jsonify({'message': 'Joined quiz successfully', 'player_id': player.id}), 200
+    return jsonify({'message': 'Joined quiz successfully', 'user_id': current_user.id}), 200
 
 @bp.route('/host/<quiz_id>')
 @login_required 
@@ -114,82 +105,78 @@ def host_quiz(quiz_id):
     return render_template('quiz/host_quiz.html',  quiz_data=quiz_data, current_question=current_question_text)
 
 @bp.route('/players/<quiz_id>')
-@login_required 
+@login_required
 def get_players(quiz_id):
-    players = Player.query.filter_by(quiz_id=quiz_id).all()
-    players_and_points = [{'name':player.name, 'points':player.score} for player in players]
-    return jsonify(players_and_points)
+    quiz = Quiz.query.filter_by(quiz_id=quiz_id).first()
+    if quiz is None:
+        return jsonify({'error': 'Quiz not found'}), 404
+
+    # Get all UserQuizzes entries for the quiz
+    user_quizzes = UserQuizzes.query.filter_by(quiz_id=quiz_id).all()  
+
+    users_and_points = []
+    for user_quiz in user_quizzes:
+        users_and_points.append({
+            'name': user_quiz.user.username,
+            'points': user_quiz.score
+        })
+
+    return jsonify(users_and_points)
+
 
 @bp.route('/answer', methods=['POST'])
-@login_required 
+@login_required
 def handle_answer():
     data = request.get_json()
     quiz_id = data.get('quiz_id')
-    player_id = data.get('player_id')
     answer = data.get('answer')
 
-    player = Player.query.filter_by(id=player_id, quiz_id=quiz_id).first()
-    current_question_relationship = CurrentQuestion.query.filter_by(quiz_id=quiz_id).first()
-    question = current_question_relationship.question
+    current_question_rel = CurrentQuestion.query.filter_by(quiz_id=quiz_id).first()
+    if not current_question_rel:
+        return jsonify({'error': 'Quiz or question not found'}), 404
+    question = current_question_rel.question
 
-    answer_record = Answer(player_id=player.id, question_id=question.id, answer_text=answer)
+    answer_record = Answer(user_id=current_user.id, question_id=question.id, answer_text=answer)
     db.session.add(answer_record)
     db.session.commit()
 
-    if player is None or question is None:
-        return jsonify({'error': 'Player or question not found'}), 400
-
     is_correct = answer == question.answer
 
-    if is_correct:
-        player.score = (player.score or 0) + 1 
+    user_quiz = UserQuizzes.query.filter_by(user_id=current_user.id, quiz_id=quiz_id).first()
+    if user_quiz:
+        if is_correct:
+            user_quiz.score += 1
         db.session.commit()
 
     socketio.emit('answer_submitted', {
         'quiz_id': quiz_id,
-        'player_name': player.name,
+        'user_id': current_user.id, 
         'is_correct': is_correct
     }, namespace='/quiz')
 
-    quiz_players = Player.query.filter_by(quiz_id=quiz_id).all()
-    current_question_id = CurrentQuestion.query.filter_by(quiz_id=quiz_id).first().question_id
+    quiz = Quiz.query.filter_by(quiz_id=quiz_id).first()
+    if quiz is None:
+        return jsonify({'error': 'Quiz not found'}), 404
 
-    if all(any(answer.question_id == current_question_id for answer in player.answers) for player in quiz_players):
+    quiz_users = User.query.join(UserQuizzes).filter(UserQuizzes.quiz_id == quiz_id).all()  
+
+    current_question_id = current_question_rel.question_id
+
+    if all(any(a.question_id == current_question_id for a in user.answers) for user in quiz_users):
         socketio.emit('all_players_answered', {'quiz_id': quiz_id, 'correct_answer': question.answer}, namespace='/quiz')
-        quiz = Quiz.query.filter_by(quiz_id=quiz_id).first()
-        current_question_index = quiz.questions.index(quiz.current_question_relationship.question)
+
+        current_question_index = quiz.questions.index(question)
         if current_question_index < len(quiz.questions) - 1:
-            quiz.current_question_relationship.question = quiz.questions[current_question_index + 1] 
+            quiz.current_question_relationship.question = quiz.questions[current_question_index + 1]
             db.session.commit()
             time.sleep(5)
             emit_next_question(quiz_id)
-        else:  
+        else:
             quiz.state = 'finished'
             db.session.commit()
             socketio.emit('quiz_finished', {'quiz_id': quiz_id}, namespace='/quiz')
 
     return jsonify({'message': 'Answer received'}), 200
-
-
-@bp.route('/rejoin/<quiz_id>', methods=['POST'])
-@login_required 
-def rejoin_quiz(quiz_id):
-    player_name = request.get_json().get('player_name')
-    if not player_name:
-        return jsonify({'error': 'Player name is required'}), 400
-
-    # Find the player in the database
-    player = Player.query.filter_by(quiz_id=quiz_id, name=player_name).first()
-    if player is None:
-        return jsonify({'error': 'Player not found in this quiz'}), 404
-
-    # (Optional) Update player status or last answered question if needed
-
-    # Emit a 'player_rejoined' event (you might want to include the player's ID or other data)
-    socketio.emit('player_rejoined', {'quiz_id': quiz_id, 'player_name': player_name}, namespace='/quiz')
-
-    # Return a success response
-    return jsonify({'success': True, 'message': 'Rejoined quiz successfully'}), 200
 
  
     

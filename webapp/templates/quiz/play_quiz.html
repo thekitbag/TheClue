@@ -113,13 +113,13 @@
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'  
-      },
-      body: JSON.stringify({ player_id: playerId })  
+      }
     })
     .then(response => response.json())
         .then(data => {
-          if (data.player_id) {
-            playerId = data.player_id; 
+          if (data.user_id) {
+            userId = data.user_id;
+            document.getElementById('join-quiz-button').style.display = 'none';
             document.getElementById('question-container').style.display = 'block';
             document.getElementById('waiting-message').innerHTML = 'Waiting for other players to join...';
 

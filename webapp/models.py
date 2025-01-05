@@ -7,6 +7,8 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), index=True, unique=True)
     email = db.Column(db.String(120), index=True, unique=True)
     password_hash = db.Column(db.String(128))
+    quizzes = db.relationship('Quiz', secondary='user_quizzes', backref=db.backref('user_quizzes_rel', lazy='dynamic'))
+
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -32,12 +34,24 @@ class Quiz(db.Model):
     def __repr__(self):
         return f'<Quiz {self.quiz_name}>'
 
+class UserQuizzes(db.Model):
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), primary_key=True)
+    quiz_id = db.Column(db.String(64), db.ForeignKey('quiz.quiz_id'), primary_key=True)
+    score = db.Column(db.Integer, default=0)
+
+    user = db.relationship('User', backref=db.backref('user_quizzes', lazy='dynamic'))
+    quiz = db.relationship('Quiz', backref=db.backref('users_in_quiz', lazy='dynamic'))
+ 
+
+    def __repr__(self):
+        return f'<UserQuizzes {self.user_id} {self.quiz_id}>' 
+
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     quiz_id = db.Column(db.String(64), db.ForeignKey('quiz.quiz_id'), index=True)
-    question_text = db.Column(db.Text)  # Store the question text
-    answer = db.Column(db.String(255))  # Store the correct answer
-    options = db.Column(db.String(512))  # Store the answer options (you might need to adjust the type based on how you store them)
+    question_text = db.Column(db.Text)  
+    answer = db.Column(db.String(255))
+    options = db.Column(db.String(512))
 
     quiz = db.relationship('Quiz', backref='questions', foreign_keys=[quiz_id])  # Specify foreign_keys
 
@@ -70,11 +84,13 @@ class Player(db.Model):
 
 class Answer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), index=True)  
+
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'), index=True)
     answer_text = db.Column(db.String(255))  # Store the player's answer
 
-    player = db.relationship('Player', backref='answers')
+    user = db.relationship('User', backref='answers')  
+
     question = db.relationship('Question', backref='answers')
 
     def __repr__(self):
