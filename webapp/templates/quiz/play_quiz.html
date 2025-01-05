@@ -6,22 +6,26 @@
 <div class="flex flex-col items-center justify-center min-h-screen bg-gray-100">
   <h1 class="text-4xl font-bold mb-8 text-gray-800">{{ quiz_data.quiz_name }}</h1>
 
-  <div id="player-name-form" class="w-full max-w-sm">
-    <div class="mb-4">
-        <label for="player_name" class="block text-gray-700 font-bold mb-2">Enter your name:</label>
-        <input type="text" id="player_name" name="player_name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-    </div>
+  {% if quiz_data.state == 'registering' %} 
     <div class="flex items-center justify-between">
-        <button type="button" onclick="joinQuiz()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+        <button id="join-quiz-button" type="button" onclick="joinQuiz()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"> 
             Join Quiz
         </button>
     </div>
-  </div>
+  {% elif quiz_data.state == 'started' %}
+    <div class="flex items-center justify-between">
+        <button type="button" onclick="rejoinQuiz()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+            Rejoin Quiz
+        </button>
+    </div>
+    {% endif %}
 
   <div id="waiting-message" class="text-xl font-semibold mt-4" style="display: none;">Waiting for other players to join...</div> 
   <div id="feedback" class="text-5xl font-bold mt-12 text-center"></div>
   <div id="options" class="mt-12"> </div> 
+</div>
 
+  <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 
   <script>
     const quizId = "{{ quiz_data.quiz_id }}";
@@ -35,6 +39,14 @@
         // Display the "Quiz started" message
         const feedbackDiv = document.getElementById('feedback');
         feedbackDiv.textContent = 'Quiz started, get ready for the first question!'; 
+      }
+    });
+
+    socket.on('quiz_finished', (data) => {
+      if (data.quiz_id === quizId) {
+
+        const waitingDiv = document.getElementById('waiting-message');
+        waitingDiv.textContent = 'Quiz finished. Ask your host to reveal the winner!'; 
       }
     });
     
@@ -87,22 +99,24 @@
         }
     })
 
+    socket.on('all_players_answered', (data) => {
+            if (data.quiz_id === quizId) {
+                const waitingDiv = document.getElementById('waiting-message');
+                waitingDiv.innerHTML = 'The correct answer was: ' + data.correct_answer + '<br><br> Get ready for the next question!';
+            }
+        });
+
     function joinQuiz() {
-      let playerName = document.getElementById('player_name').value;
-      document.getElementById('player-name-form').remove();
       document.getElementById('waiting-message').style.display = 'block'; 
 
-
-
-      // Send player name to the server
       fetch(`/join/${quizId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: `player_name=${playerName}`
-        })
-        .then(response => response.json())
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'  
+      },
+      body: JSON.stringify({ player_id: playerId })  
+    })
+    .then(response => response.json())
         .then(data => {
           if (data.player_id) {
             playerId = data.player_id; 
@@ -115,7 +129,32 @@
           }
         });
     }
+
+    function rejoinQuiz() {
+      const playerName = document.getElementById('player_name').value;
+
+      // Send a request to rejoin the quiz (you'll need to create this route)
+      fetch(`/quiz/rejoin/${quizId}`, { 
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ player_name: playerName })
+      })
+      .then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              // Hide the rejoin form and proceed with the quiz
+              document.getElementById('rejoin-form').style.display = 'none';
+              // ... (fetch and display the current question) ...
+          } else {
+              // Handle errors (e.g., player not found)
+              console.error('Failed to rejoin the quiz');
+          }
+      });
+  }
   </script>
+
 </div>
 {% endblock %}
 

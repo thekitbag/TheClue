@@ -9,7 +9,7 @@ from flask import current_app
 
 def store_quiz_configuration(quiz_id, quiz_name, num_questions, num_players, questions):
 
-    quiz = Quiz(quiz_id=quiz_id, quiz_name=quiz_name, num_players=num_players, num_questions=num_questions)
+    quiz = Quiz(quiz_id=quiz_id, quiz_name=quiz_name, num_players=num_players, num_questions=num_questions, state='registering')
     db.session.add(quiz)
 
 
@@ -34,8 +34,8 @@ def generate_questions(topic, num_questions):
 
 
     system_message = "You are quizGPT, you will receive a topic and a number of questions. \
-    Provide the questions and answers in json format. The players will be british and of slightly \
-    above average intelligence. You should always provide four options and indicate which one is correct.\
+    Provide the questions and answers in json format. The players will be british and of significantly \
+    above average intelligence, but not genius level. You should always provide four options and indicate which one is correct.\
     The response should be JSON which consists of a list of dictionaries. Each list has 3 keys: 'question', \
     'options' and 'answer'. 'question' should have a value thas is a string containing a question. 'options' \
     should be a list of strings containing the possible answers', 'answer' should contain a string matching one of \

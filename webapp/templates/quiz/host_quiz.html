@@ -17,7 +17,14 @@
         <tbody> </tbody> 
     </table> 
   
-    <div id="feedback" class="text-4xl font-bold text-center"></div> 
+    <div id="feedback" class="text-4xl font-bold text-center"></div>
+    <div id="current_question" class="text-4xl font-bold text-center">
+        {% if quiz_data.state == 'started' %}
+            {{ current_question.question_text }}
+        {% elif quiz_data.state == 'finished' %} 
+            <p>Quiz finished!</p> 
+        {% endif %}
+    </div>
     <div id="options" class="mt-8"></div> 
 </div>
 
@@ -38,6 +45,13 @@
             if (data.quiz_id === quizId) {
                 const feedbackDiv = document.getElementById('feedback');
                 feedbackDiv.textContent = 'Quiz started, get ready for the first question!'; 
+            }
+        });
+
+        socket.on('quiz_finished', (data) => {
+            if (data.quiz_id === quizId) {
+                const feedbackDiv = document.getElementById('feedback');
+                feedbackDiv.textContent = 'Quiz finished!'; 
             }
         });
 
@@ -75,7 +89,7 @@
                     nameCell.style.backgroundColor = 'initial'; 
                 }
                 const feedbackDiv = document.getElementById('feedback');
-                feedbackDiv.textContent = 'Well done winners! on to the next question!'; 
+                feedbackDiv.textContent = 'The correct answer was: ' + data.correct_answer; 
 
                 // 2. Update the leaderboard
                 fetchAndDisplayPlayers(); 
@@ -108,6 +122,8 @@
     });
 
     </script>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+
 </body>
 </html>
 
